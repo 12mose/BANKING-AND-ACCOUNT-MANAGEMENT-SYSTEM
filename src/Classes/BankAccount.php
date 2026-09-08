@@ -140,6 +140,36 @@ abstract class BankAccount
         $this->transactions[] = $transaction;
     }
 
+    protected function chargeFee(int $amountInCents, string $description): Transaction
+    {
+        if (!$this->isActive()) {
+            throw new ClosedAccountException('Cannot charge a fee to a closed account.');
+        }
+
+        $validatedAmount = Validator::amount($amountInCents);
+        $cleanDescription = Validator::description($description);
+
+        if (!$this->canWithdraw($validatedAmount)) {
+            throw new InsufficientFundsException('Account balance cannot cover the required fee.');
+        }
+
+        $this->balanceInCents -= $validatedAmount;
+
+        $transaction = new Transaction(
+            $this->generateTransactionId(),
+            new DateTimeImmutable('now'),
+            TransactionType::FEE,
+            $validatedAmount,
+            $this->accountNumber,
+            null,
+            $cleanDescription === '' ? 'Account fee' : $cleanDescription,
+        );
+
+        $this->recordTransaction($transaction);
+
+        return $transaction;
+    }
+
     abstract protected function canWithdraw(int $amountInCents): bool;
 
     private function generateTransactionId(): string
