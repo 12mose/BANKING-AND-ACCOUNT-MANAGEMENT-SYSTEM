@@ -1,49 +1,45 @@
 <?php
-require_once __DIR__ . "/Customer.php";
-class BankAccount{
-    // constraints
-    const MINIMUM_BALANCE = 500;
-    const TRANSFER_FEE = 0.03;
-    const MAX_WITHDRAWAL = 2000000;
-    const BANK_NAME = "BNR";
-    // Instance variables
+
+declare(strict_types=1);
+
+require_once __DIR__ . '/Customer.php';
+require_once __DIR__ . '/../Enums/AccountStatus.php';
+
+abstract class BankAccount
+{
     protected string $accountNumber;
     protected Customer $accountHolder;
-    protected float $balance;
-    protected string $accountType;
-    protected string $status;
-    // constructor
-    function __construct(string $accountNumber, Customer $accountHolder, float $balance, string $accountType, string $status){
+    protected int $balanceInCents;
+    protected AccountStatus $status;
+
+    protected function __construct(
+        string $accountNumber,
+        Customer $accountHolder,
+        int $openingBalanceInCents = 0,
+    ) {
         $this->accountNumber = $accountNumber;
         $this->accountHolder = $accountHolder;
-        $this->balance = $balance;
-        $this->accountType = $accountType;
-        $this->status = $status;
+        $this->balanceInCents = $openingBalanceInCents;
+        $this->status = AccountStatus::ACTIVE;
     }
-    // Creating methods
-    // checking account status
-    static function checkStatus() : bool {
-        if($this->status === "closed"){
-            return false;
-        }
-        return true;
-        
-    }
-    // DEPOSIT Function
-    function deposit(float $amount) : void {
-    //checking status
-    if(!$this->checkStatus()){
-        // exceptions
-    throw new Exception("The account is closed");
-    }
-    // checking if amount is positive
-    if($amount < 0 ){
-        throw new Exception("Invalid amount");
-    }
-    // deposit amount
-    $this->balance += $amount;
 
+    public function getAccountNumber(): string
+    {
+        return $this->accountNumber;
+    }
+
+    public function getBalanceInCents(): int
+    {
+        return $this->balanceInCents;
+    }
+
+    public function getStatus(): AccountStatus
+    {
+        return $this->status;
+    }
+
+    public function isActive(): bool
+    {
+        return $this->status === AccountStatus::ACTIVE;
     }
 }
-$bankAccount1 = new BankAccount();
- ?>
