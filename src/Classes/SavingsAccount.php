@@ -8,13 +8,15 @@ require_once __DIR__ . '/../Validation/Validator.php';
 final class SavingsAccount extends BankAccount
 {
 	// Named policy values belong to the savings account rules they control.
-	public const MINIMUM_BALANCE = 50000;
-	public const MAX_WITHDRAWAL = 2000000;
+	public const MINIMUM_BALANCE_IN_CENTS = 50000;
+	public const MAX_WITHDRAWAL_IN_CENTS = 2000000;
+	public const MINIMUM_BALANCE = self::MINIMUM_BALANCE_IN_CENTS;
+	public const MAX_WITHDRAWAL = self::MAX_WITHDRAWAL_IN_CENTS;
 
 	public function __construct(
 		string $accountNumber,
 		Customer $accountHolder,
-		int $openingBalanceInCents = self::MINIMUM_BALANCE,
+		int $openingBalanceInCents = self::MINIMUM_BALANCE_IN_CENTS,
 	) {
 		parent::__construct(
 			Validator::accountNumber($accountNumber),
@@ -22,16 +24,16 @@ final class SavingsAccount extends BankAccount
 			$openingBalanceInCents,
 		);
 
-		if ($openingBalanceInCents < self::MINIMUM_BALANCE) {
+		if ($openingBalanceInCents < self::MINIMUM_BALANCE_IN_CENTS) {
 			throw new InvalidAmountException('Savings opening balance must meet the minimum balance.');
 		}
 	}
 
-	public function canWithdraw(int $amountInCents): bool
+	protected function canWithdraw(int $amountInCents): bool
 	{
 		Validator::amount($amountInCents);
 
-		return $amountInCents <= self::MAX_WITHDRAWAL
-			&& $this->balanceInCents - $amountInCents >= self::MINIMUM_BALANCE;
+		return $amountInCents <= self::MAX_WITHDRAWAL_IN_CENTS
+			&& $this->balanceInCents - $amountInCents >= self::MINIMUM_BALANCE_IN_CENTS;
 	}
 }
