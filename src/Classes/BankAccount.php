@@ -3,7 +3,13 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/Customer.php';
+require_once __DIR__ . '/Transaction.php';
 require_once __DIR__ . '/../Enums/AccountStatus.php';
+require_once __DIR__ . '/../Enums/TransactionType.php';
+require_once __DIR__ . '/../Validation/Validator.php';
+require_once __DIR__ . '/../Exceptions/ClosedAccountException.php';
+require_once __DIR__ . '/../Exceptions/InsufficientFundsException.php';
+require_once __DIR__ . '/../Exceptions/InvalidAmountException.php';
 
 abstract class BankAccount
 {
@@ -12,13 +18,21 @@ abstract class BankAccount
     protected int $balanceInCents;
     protected AccountStatus $status;
 
+    /** @var array<int, Transaction> */
+    protected array $transactions = [];
+
     protected function __construct(
         string $accountNumber,
         Customer $accountHolder,
         int $openingBalanceInCents = 0,
     ) {
-        $this->accountNumber = $accountNumber;
+        $this->accountNumber = Validator::accountNumber($accountNumber);
         $this->accountHolder = $accountHolder;
+
+        if ($openingBalanceInCents < 0) {
+            throw new InvalidAmountException('Opening balance cannot be negative.');
+        }
+
         $this->balanceInCents = $openingBalanceInCents;
         $this->status = AccountStatus::ACTIVE;
     }
@@ -46,5 +60,90 @@ abstract class BankAccount
     public function isActive(): bool
     {
         return $this->status === AccountStatus::ACTIVE;
+    }
+
+    public function deposit(int $amountInCents, string $description = ''): Transaction
+    {
+        if (!$this->isActive()) {
+            throw new ClosedAccountException('Cannot deposit into a closed account.');
+        }
+
+        $validatedAmount = Validator::amount($amountInCents);
+        $cleanDescription = Validator::description($description);
+
+        $this->balanceInCents += $validatedAmount;
+
+        $transaction = new Transaction(
+            $this->generateTransactionId(),
+            new DateTimeImmutable('now'),
+            TransactionType::DEPOSIT,
+            $validatedAmount,
+            null,
+            $this->accountNumber,
+            $cleanDescription === '' ? 'Deposit' : $cleanDescription,
+        );
+
+        $this->recordTransaction($transaction);
+
+        return $transaction;
+    }
+
+    public function withdraw(int $amountInCents, string $description = ''): Transaction
+    {
+        if (!$this->isActive()) {
+            throw new ClosedAccountException('Cannot withdraw from a closed account.');
+        }
+
+        $validatedAmount = Validator::amount($amountInCents);
+        $cleanDescription = Validator::description($description);
+
+        if (!$this->canWithdraw($validatedAmount)) {
+            throw new InsufficientFundsException('Withdrawal exceeds the permitted balance or policy limit.');
+        }
+
+        $this->balanceInCents -= $validatedAmount;
+
+        $transaction = new Transaction(
+            $this->generateTransactionId(),
+            new DateTimeImmutable('now'),
+            TransactionType::WITHDRAWAL,
+            $validatedAmount,
+            $this->accountNumber,
+            null,
+            $cleanDescription === '' ? 'Withdrawal' : $cleanDescription,
+        );
+
+        $this->recordTransaction($transaction);
+
+        return $transaction;
+    }
+
+    public function close(): void
+    {
+        if ($this->status === AccountStatus::CLOSED) {
+            throw new ClosedAccountException('Account is already closed.');
+        }
+
+        $this->status = AccountStatus::CLOSED;
+    }
+
+    /**
+     * @return array<int, Transaction>
+     */
+    public function getTransactions(): array
+    {
+        return $this->transactions;
+    }
+
+    protected function recordTransaction(Transaction $transaction): void
+    {
+        $this->transactions[] = $transaction;
+    }
+
+    abstract protected function canWithdraw(int $amountInCents): bool;
+
+    private function generateTransactionId(): string
+    {
+        return 'TXN-' . strtoupper(bin2hex(random_bytes(8)));
     }
 }
