@@ -168,7 +168,7 @@ transaction categories constrained and UML-visible.
 
 ### Domain exceptions
 
-All extend `DomainException`, which extends PHP's `RuntimeException`:
+All extend `BankingDomainException`, which extends PHP's `RuntimeException`:
 
 - `InvalidAmountException`: zero, negative, or otherwise invalid amount.
 - `InsufficientFundsException`: account policy rejects a withdrawal.
