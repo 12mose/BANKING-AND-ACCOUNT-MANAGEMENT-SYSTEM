@@ -28,6 +28,11 @@ abstract class BankAccount
         return $this->accountNumber;
     }
 
+    public function getAccountHolder(): Customer
+    {
+        return $this->accountHolder;
+    }
+
     public function getBalanceInCents(): int
     {
         return $this->balanceInCents;
