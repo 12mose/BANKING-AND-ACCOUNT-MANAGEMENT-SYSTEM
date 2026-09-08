@@ -22,6 +22,10 @@ The completed prototype will allow users to:
 - Generate an account statement.
 - Close an account.
 
+The agreed requirements, acceptance rules, deliverable ownership checklist,
+and open design decisions are recorded in the
+[requirements and final review checklist](docs/requirements-and-review-checklist.md).
+
 ## Learning objectives
 
 The project demonstrates:
