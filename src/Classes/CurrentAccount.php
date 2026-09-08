@@ -10,6 +10,8 @@ final class CurrentAccount extends BankAccount
 	// Named policy values belong to current-account overdraft and fee rules.
 	public const OVERDRAFT_LIMIT = 0;
 	public const TRANSFER_FEE = 300;
+	public const OVERDRAFT_LIMIT_IN_CENTS = self::OVERDRAFT_LIMIT;
+	public const TRANSFER_FEE_IN_CENTS = self::TRANSFER_FEE;
 
 	public function __construct(
 		string $accountNumber,
@@ -23,15 +25,23 @@ final class CurrentAccount extends BankAccount
 		);
 	}
 
-	public function canWithdraw(int $amountInCents): bool
+	protected function canWithdraw(int $amountInCents): bool
 	{
 		Validator::amount($amountInCents);
 
-		return $this->balanceInCents - $amountInCents >= -self::OVERDRAFT_LIMIT;
+		return $this->balanceInCents - $amountInCents >= -self::OVERDRAFT_LIMIT_IN_CENTS;
 	}
 
 	public function getTransferFeeInCents(): int
 	{
-		return self::TRANSFER_FEE;
+		return self::TRANSFER_FEE_IN_CENTS;
+	}
+
+	public function applyTransferFee(): Transaction
+	{
+		return $this->chargeFee(
+			self::TRANSFER_FEE_IN_CENTS,
+			'Transfer fee',
+		);
 	}
 }
