@@ -27,7 +27,7 @@ final class CurrentAccount extends BankAccount
 	{
 		Validator::amount($amountInCents);
 
-		return $this->balanceInCents - $amountInCents >= -self::OVERDRAFT_LIMIT;
+		return $this->getBalanceForPolicy() - $amountInCents >= -self::OVERDRAFT_LIMIT;
 	}
 
 	public function getTransferFeeInCents(): int

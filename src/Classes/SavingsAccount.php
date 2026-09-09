@@ -32,6 +32,6 @@ final class SavingsAccount extends BankAccount
 		Validator::amount($amountInCents);
 
 		return $amountInCents <= self::MAX_WITHDRAWAL
-			&& $this->balanceInCents - $amountInCents >= self::MINIMUM_BALANCE;
+			&& $this->getBalanceForPolicy() - $amountInCents >= self::MINIMUM_BALANCE;
 	}
 }

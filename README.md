@@ -4,7 +4,7 @@ A PHP Object-Oriented Programming (OOP) prototype for managing customers, bank a
 
 This repository contains the work for **Group 2 — Activity 2: Design and Develop an OOP-Based Banking System**.
 
-> **Project status:** Planning and initial setup. Development work is organized in the [GitHub issue backlog](https://github.com/12mose/BANKING-AND-ACCOUNT-MANAGEMENT-SYSTEM/issues).
+> **Project status:** Working PHP OOP prototype with terminal and browser demonstrations.
 
 ## Project overview
 
@@ -167,6 +167,21 @@ php -S localhost:8000 -t public
 ```
 
 Then open [http://localhost:8000](http://localhost:8000) in a browser.
+
+For a terminal demonstration of successful operations and handled errors:
+
+```bash
+php tests/RunDemo.php
+```
+
+For an interactive terminal menu:
+
+```bash
+php tests/InteractiveBanking.php
+```
+
+The interactive demo starts with `SAV-CLI1` and `CUR-CLI1` accounts. Enter
+amounts in normal currency units, such as `25.50`.
 
 ### Run tests
 
