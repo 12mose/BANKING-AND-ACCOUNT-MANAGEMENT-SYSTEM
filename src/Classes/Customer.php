@@ -103,5 +103,3 @@ final class Customer
 		return $normalized;
 	}
 }
-
-?>
