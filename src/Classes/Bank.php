@@ -6,11 +6,12 @@ require_once __DIR__ . '/BankAccount.php';
 require_once __DIR__ . '/CurrentAccount.php';
 require_once __DIR__ . '/Customer.php';
 require_once __DIR__ . '/SavingsAccount.php';
+require_once __DIR__ . '/../Validation/Validator.php';
 require_once __DIR__ . '/../Exceptions/AccountNotFoundException.php';
 require_once __DIR__ . '/../Exceptions/DuplicateAccountException.php';
 require_once __DIR__ . '/../Exceptions/DuplicateCustomerException.php';
 require_once __DIR__ . '/../Exceptions/CustomerNotFoundException.php';
-require_once __DIR__ . '/../Validation/Validator.php';
+require_once __DIR__ . '/../Exceptions/InvalidAmountException.php';
 
 final class Bank
 {
@@ -126,6 +127,28 @@ final class Bank
 		}
 
 		return $this->accounts[$normalizedNumber];
+	}
+
+	/** @return array{0: Transaction, 1: Transaction} */
+	public function transfer(
+		string $sourceAccountNumber,
+		string $destinationAccountNumber,
+		int $amountInCents,
+		string $description = '',
+	): array {
+		$source = $this->getAccount($sourceAccountNumber);
+		$destination = $this->getAccount($destinationAccountNumber);
+
+		if ($source === $destination) {
+			throw new InvalidAmountException('Source and destination accounts must differ.');
+		}
+
+		$validatedAmount = Validator::amount($amountInCents);
+		$fee = $source instanceof CurrentAccount ? $source->getTransferFeeInCents() : 0;
+		$debit = $source->postTransferDebit($validatedAmount + $fee, $destination->getAccountNumber(), $description);
+		$credit = $destination->postTransferCredit($validatedAmount, $source->getAccountNumber(), $description);
+
+		return [$debit, $credit];
 	}
 
 	public function closeAccount(string $accountNumber): void

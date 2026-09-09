@@ -45,11 +45,8 @@ final class Customer
 
 	public function updateContactDetails(string $fullName, string $email): void
 	{
-		$validatedName = Validator::name($fullName);
-		$validatedEmail = $this->validateEmail($email);
-
-		$this->fullName = $validatedName;
-		$this->email = $validatedEmail;
+		$this->fullName = Validator::name($fullName);
+		$this->email = $this->validateEmail($email);
 	}
 
 	public function addAccount(BankAccount $account): void
@@ -60,7 +57,6 @@ final class Customer
 			throw new DuplicateAccountException('Customer already owns this account.');
 		}
 
-		// Ensure the account's declared holder is this customer.
 		if ($account->getAccountHolder() !== $this) {
 			throw new DuplicateAccountException('Account belongs to a different customer.');
 		}
@@ -68,9 +64,6 @@ final class Customer
 		$this->accounts[$accountNumber] = $account;
 	}
 
-	/**
-	 * Returns owned account by account number or throws AccountNotFoundException.
-	 */
 	public function getAccount(string $accountNumber): BankAccount
 	{
 		$normalized = Validator::accountNumber($accountNumber);
@@ -82,11 +75,7 @@ final class Customer
 		return $this->accounts[$normalized];
 	}
 
-	/**
-	 * Returns a copy of the account map keyed by account number.
-	 * Callers cannot directly mutate ownership by changing the returned array.
-	 * @return array<string, BankAccount>
-	 */
+	/** @return array<string, BankAccount> */
 	public function getAccounts(): array
 	{
 		return $this->accounts;

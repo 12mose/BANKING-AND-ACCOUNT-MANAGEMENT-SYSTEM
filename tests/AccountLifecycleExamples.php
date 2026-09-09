@@ -104,7 +104,9 @@ expectLifecycleFailure(
 );
 
 expectLifecycleFailure(
-    static fn(): void => $bank->closeAccount($current->getAccountNumber()),
+    static function () use ($bank, $current): void {
+        $bank->closeAccount($current->getAccountNumber());
+    },
     ClosedAccountException::class,
 );
 

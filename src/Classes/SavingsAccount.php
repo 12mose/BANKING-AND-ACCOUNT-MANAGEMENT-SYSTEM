@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/BankAccount.php';
 require_once __DIR__ . '/../Validation/Validator.php';
+require_once __DIR__ . '/../Exceptions/InvalidAmountException.php';
 
 final class SavingsAccount extends BankAccount
 {
@@ -34,6 +35,6 @@ final class SavingsAccount extends BankAccount
 		Validator::amount($amountInCents);
 
 		return $amountInCents <= self::MAX_WITHDRAWAL_IN_CENTS
-			&& $this->balanceInCents - $amountInCents >= self::MINIMUM_BALANCE_IN_CENTS;
+			&& $this->getBalanceForPolicy() - $amountInCents >= self::MINIMUM_BALANCE_IN_CENTS;
 	}
 }
