@@ -4,6 +4,6 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/DomainException.php';
 
-class DuplicateAccountException extends BankingDomainException
+class InvalidEmailException extends BankingDomainException
 {
 }

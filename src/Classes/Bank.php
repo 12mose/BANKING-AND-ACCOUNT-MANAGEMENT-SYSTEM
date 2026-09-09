@@ -2,13 +2,16 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/Customer.php';
 require_once __DIR__ . '/BankAccount.php';
-require_once __DIR__ . '/SavingsAccount.php';
 require_once __DIR__ . '/CurrentAccount.php';
-require_once __DIR__ . '/Transaction.php';
-require_once __DIR__ . '/../Exceptions/InvalidAmountException.php';
+require_once __DIR__ . '/Customer.php';
+require_once __DIR__ . '/SavingsAccount.php';
 require_once __DIR__ . '/../Validation/Validator.php';
+require_once __DIR__ . '/../Exceptions/AccountNotFoundException.php';
+require_once __DIR__ . '/../Exceptions/DuplicateAccountException.php';
+require_once __DIR__ . '/../Exceptions/DuplicateCustomerException.php';
+require_once __DIR__ . '/../Exceptions/CustomerNotFoundException.php';
+require_once __DIR__ . '/../Exceptions/InvalidAmountException.php';
 
 final class Bank
 {
@@ -19,66 +22,132 @@ final class Bank
 	private array $customers = [];
 	/** @var array<string, BankAccount> */
 	private array $accounts = [];
+	private int $nextAccountNumber = 1;
 
 	public function registerCustomer(Customer $customer): void
 	{
-		require_once __DIR__ . '/../Exceptions/DuplicateCustomerException.php';
-		if (isset($this->customers[$customer->getCustomerId()])) {
-			throw new DuplicateCustomerException('Customer ID is already registered.');
+		$customerId = $customer->getCustomerId();
+
+		if (isset($this->customers[$customerId])) {
+			throw new DuplicateCustomerException('Customer id is already registered.');
 		}
-		$this->customers[$customer->getCustomerId()] = $customer;
+
+		$this->customers[$customerId] = $customer;
 	}
 
 	public function getCustomer(string $customerId): Customer
 	{
-		require_once __DIR__ . '/../Exceptions/CustomerNotFoundException.php';
-		if (!isset($this->customers[$customerId])) {
-			throw new CustomerNotFoundException('Customer was not found.');
+		$normalizedId = trim($customerId);
+
+		if (!isset($this->customers[$normalizedId])) {
+			throw new CustomerNotFoundException('Customer not found.');
 		}
-		return $this->customers[$customerId];
+
+		return $this->customers[$normalizedId];
 	}
 
-	public function openSavingsAccount(string $customerId, string $accountNumber, int $openingBalanceInCents = SavingsAccount::MINIMUM_BALANCE): SavingsAccount
+	public function registerAccount(BankAccount $account): void
 	{
-		$customer = $this->getCustomer($customerId);
-		$this->assertAccountNumberAvailable($accountNumber);
-		$account = new SavingsAccount($accountNumber, $customer, $openingBalanceInCents);
+		$accountNumber = Validator::accountNumber($account->getAccountNumber());
+		$customer = $account->getAccountHolder();
+
+		if (isset($this->accounts[$accountNumber])) {
+			throw new DuplicateAccountException('Account number is already registered.');
+		}
+
+		if (!isset($this->customers[$customer->getCustomerId()])) {
+			throw new CustomerNotFoundException('Account holder is not registered.');
+		}
+
+		if ($this->customers[$customer->getCustomerId()] !== $customer) {
+			throw new DuplicateCustomerException('Account holder does not match the registered customer.');
+		}
+
+		$customer->addAccount($account);
+		$this->accounts[$accountNumber] = $account;
+	}
+
+	public function openSavingsAccount(
+		string $customerId,
+		string|int|null $accountNumber = null,
+		?int $openingBalanceInCents = null,
+	): SavingsAccount {
+		[$accountNumber, $openingBalanceInCents] = $this->resolveOpeningDetails(
+			$accountNumber,
+			$openingBalanceInCents,
+			SavingsAccount::MINIMUM_BALANCE,
+		);
+
+		$account = new SavingsAccount(
+			$accountNumber,
+			$this->getCustomer($customerId),
+			$openingBalanceInCents,
+		);
 		$this->registerAccount($account);
+
 		return $account;
 	}
 
-	public function openCurrentAccount(string $customerId, string $accountNumber, int $openingBalanceInCents = 0): CurrentAccount
-	{
-		$customer = $this->getCustomer($customerId);
-		$this->assertAccountNumberAvailable($accountNumber);
-		$account = new CurrentAccount($accountNumber, $customer, $openingBalanceInCents);
+	public function openCurrentAccount(
+		string $customerId,
+		string|int|null $accountNumber = null,
+		?int $openingBalanceInCents = null,
+	): CurrentAccount {
+		[$accountNumber, $openingBalanceInCents] = $this->resolveOpeningDetails(
+			$accountNumber,
+			$openingBalanceInCents,
+			0,
+		);
+
+		$account = new CurrentAccount(
+			$accountNumber,
+			$this->getCustomer($customerId),
+			$openingBalanceInCents,
+		);
 		$this->registerAccount($account);
+
 		return $account;
+	}
+
+	public function generateAccountNumber(): string
+	{
+		do {
+			$accountNumber = sprintf('%s-%06d', self::BANK_NAME, $this->nextAccountNumber++);
+		} while (isset($this->accounts[$accountNumber]));
+
+		return $accountNumber;
 	}
 
 	public function getAccount(string $accountNumber): BankAccount
 	{
-		require_once __DIR__ . '/../Validation/Validator.php';
-		require_once __DIR__ . '/../Exceptions/AccountNotFoundException.php';
-		$accountNumber = Validator::accountNumber($accountNumber);
-		if (!isset($this->accounts[$accountNumber])) {
-			throw new AccountNotFoundException('Account was not found.');
+		$normalizedNumber = Validator::accountNumber($accountNumber);
+
+		if (!isset($this->accounts[$normalizedNumber])) {
+			throw new AccountNotFoundException('Account not found.');
 		}
-		return $this->accounts[$accountNumber];
+
+		return $this->accounts[$normalizedNumber];
 	}
 
 	/** @return array{0: Transaction, 1: Transaction} */
-	public function transfer(string $sourceAccountNumber, string $destinationAccountNumber, int $amountInCents, string $description = ''): array
-	{
+	public function transfer(
+		string $sourceAccountNumber,
+		string $destinationAccountNumber,
+		int $amountInCents,
+		string $description = '',
+	): array {
 		$source = $this->getAccount($sourceAccountNumber);
 		$destination = $this->getAccount($destinationAccountNumber);
+
 		if ($source === $destination) {
 			throw new InvalidAmountException('Source and destination accounts must differ.');
 		}
-		$amountInCents = Validator::amount($amountInCents);
+
+		$validatedAmount = Validator::amount($amountInCents);
 		$fee = $source instanceof CurrentAccount ? $source->getTransferFeeInCents() : 0;
-		$debit = $source->postTransferDebit($amountInCents + $fee, $destination->getAccountNumber(), $description);
-		$credit = $destination->postTransferCredit($amountInCents, $source->getAccountNumber(), $description);
+		$debit = $source->postTransferDebit($validatedAmount + $fee, $destination->getAccountNumber(), $description);
+		$credit = $destination->postTransferCredit($validatedAmount, $source->getAccountNumber(), $description);
+
 		return [$debit, $credit];
 	}
 
@@ -87,19 +156,41 @@ final class Bank
 		$this->getAccount($accountNumber)->close();
 	}
 
-	private function assertAccountNumberAvailable(string $accountNumber): void
+	public function getAccountBalanceInCents(string $accountNumber): int
 	{
-		require_once __DIR__ . '/../Validation/Validator.php';
-		require_once __DIR__ . '/../Exceptions/DuplicateAccountException.php';
-		$accountNumber = Validator::accountNumber($accountNumber);
-		if (isset($this->accounts[$accountNumber])) {
-			throw new DuplicateAccountException('Account number is already registered.');
-		}
+		return $this->getAccount($accountNumber)->getBalanceInCents();
 	}
 
-	private function registerAccount(BankAccount $account): void
+	/** @return array<string, Customer> */
+	public function getCustomers(): array
 	{
-		$this->accounts[$account->getAccountNumber()] = $account;
-		$account->getAccountHolder()->addAccount($account);
+		return $this->customers;
+	}
+
+	/** @return array<string, BankAccount> */
+	public function getAccounts(): array
+	{
+		return $this->accounts;
+	}
+
+	/** @return array{string, int} */
+	private function resolveOpeningDetails(
+		string|int|null $accountNumber,
+		?int $openingBalanceInCents,
+		int $defaultOpeningBalanceInCents,
+	): array {
+		if (is_int($accountNumber)) {
+			if ($openingBalanceInCents !== null) {
+				throw new InvalidArgumentException('Opening balance was provided more than once.');
+			}
+
+			$openingBalanceInCents = $accountNumber;
+			$accountNumber = null;
+		}
+
+		return [
+			$accountNumber === null ? $this->generateAccountNumber() : Validator::accountNumber($accountNumber),
+			$openingBalanceInCents ?? $defaultOpeningBalanceInCents,
+		];
 	}
 }

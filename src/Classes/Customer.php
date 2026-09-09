@@ -2,13 +2,15 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/../Exceptions/AccountNotFoundException.php';
-require_once __DIR__ . '/../Exceptions/InvalidNameException.php';
 require_once __DIR__ . '/../Validation/Validator.php';
+require_once __DIR__ . '/../Exceptions/InvalidCustomerIdException.php';
+require_once __DIR__ . '/../Exceptions/InvalidEmailException.php';
+require_once __DIR__ . '/../Exceptions/DuplicateAccountException.php';
+require_once __DIR__ . '/../Exceptions/AccountNotFoundException.php';
 
 final class Customer
 {
-	private readonly string $customerId;
+	private string $customerId;
 	private string $fullName;
 	private string $email;
 	/** @var array<string, BankAccount> */
@@ -16,52 +18,77 @@ final class Customer
 
 	public function __construct(string $customerId, string $fullName, string $email)
 	{
-		$customerId = trim($customerId);
-		if ($customerId === '') {
-			throw new InvalidNameException('Customer ID must not be blank.');
+		$normalizedId = trim($customerId);
+		if ($normalizedId === '') {
+			throw new InvalidCustomerIdException('Customer id must not be blank.');
 		}
 
-		$this->customerId = $customerId;
-		$this->updateContactDetails($fullName, $email);
+		$this->customerId = $normalizedId;
+		$this->fullName = Validator::name($fullName);
+		$this->email = $this->validateEmail($email);
 	}
 
-	public function getCustomerId(): string { return $this->customerId; }
-	public function getFullName(): string { return $this->fullName; }
-	public function getEmail(): string { return $this->email; }
+	public function getCustomerId(): string
+	{
+		return $this->customerId;
+	}
+
+	public function getFullName(): string
+	{
+		return $this->fullName;
+	}
+
+	public function getEmail(): string
+	{
+		return $this->email;
+	}
 
 	public function updateContactDetails(string $fullName, string $email): void
 	{
-		$fullName = Validator::name($fullName);
-		if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
-			throw new InvalidNameException('A valid email address is required.');
-		}
-
-		$this->fullName = $fullName;
-		$this->email = trim($email);
+		$this->fullName = Validator::name($fullName);
+		$this->email = $this->validateEmail($email);
 	}
 
 	public function addAccount(BankAccount $account): void
 	{
-		if ($account->getAccountHolder() !== $this) {
-			throw new InvalidNameException('Account holder does not match customer.');
-		}
-		if (isset($this->accounts[$account->getAccountNumber()])) {
-			throw new InvalidNameException('Customer already owns this account.');
+		$accountNumber = $account->getAccountNumber();
+
+		if (isset($this->accounts[$accountNumber])) {
+			throw new DuplicateAccountException('Customer already owns this account.');
 		}
 
-		$this->accounts[$account->getAccountNumber()] = $account;
+		if ($account->getAccountHolder() !== $this) {
+			throw new DuplicateAccountException('Account belongs to a different customer.');
+		}
+
+		$this->accounts[$accountNumber] = $account;
 	}
 
 	public function getAccount(string $accountNumber): BankAccount
 	{
-		$accountNumber = Validator::accountNumber($accountNumber);
-		if (!isset($this->accounts[$accountNumber])) {
-			throw new AccountNotFoundException('Account does not belong to this customer.');
+		$normalized = Validator::accountNumber($accountNumber);
+
+		if (!isset($this->accounts[$normalized])) {
+			throw new AccountNotFoundException('Account not found for this customer.');
 		}
 
-		return $this->accounts[$accountNumber];
+		return $this->accounts[$normalized];
 	}
 
 	/** @return array<string, BankAccount> */
-	public function getAccounts(): array { return $this->accounts; }
+	public function getAccounts(): array
+	{
+		return $this->accounts;
+	}
+
+	private function validateEmail(string $email): string
+	{
+		$normalized = trim($email);
+
+		if ($normalized === '' || filter_var($normalized, FILTER_VALIDATE_EMAIL) === false) {
+			throw new InvalidEmailException('Invalid email address.');
+		}
+
+		return $normalized;
+	}
 }
