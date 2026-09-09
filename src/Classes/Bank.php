@@ -68,11 +68,17 @@ final class Bank
 
 	public function openSavingsAccount(
 		string $customerId,
-		string $accountNumber,
-		int $openingBalanceInCents = SavingsAccount::MINIMUM_BALANCE,
+		string|int|null $accountNumber = null,
+		?int $openingBalanceInCents = null,
 	): SavingsAccount {
+		[$accountNumber, $openingBalanceInCents] = $this->resolveOpeningDetails(
+			$accountNumber,
+			$openingBalanceInCents,
+			SavingsAccount::MINIMUM_BALANCE,
+		);
+
 		$account = new SavingsAccount(
-			Validator::accountNumber($accountNumber),
+			$accountNumber,
 			$this->getCustomer($customerId),
 			$openingBalanceInCents,
 		);
@@ -83,11 +89,17 @@ final class Bank
 
 	public function openCurrentAccount(
 		string $customerId,
-		string $accountNumber,
-		int $openingBalanceInCents = 0,
+		string|int|null $accountNumber = null,
+		?int $openingBalanceInCents = null,
 	): CurrentAccount {
+		[$accountNumber, $openingBalanceInCents] = $this->resolveOpeningDetails(
+			$accountNumber,
+			$openingBalanceInCents,
+			0,
+		);
+
 		$account = new CurrentAccount(
-			Validator::accountNumber($accountNumber),
+			$accountNumber,
 			$this->getCustomer($customerId),
 			$openingBalanceInCents,
 		);
@@ -116,6 +128,16 @@ final class Bank
 		return $this->accounts[$normalizedNumber];
 	}
 
+	public function closeAccount(string $accountNumber): void
+	{
+		$this->getAccount($accountNumber)->close();
+	}
+
+	public function getAccountBalanceInCents(string $accountNumber): int
+	{
+		return $this->getAccount($accountNumber)->getBalanceInCents();
+	}
+
 	/** @return array<string, Customer> */
 	public function getCustomers(): array
 	{
@@ -126,5 +148,26 @@ final class Bank
 	public function getAccounts(): array
 	{
 		return $this->accounts;
+	}
+
+	/** @return array{string, int} */
+	private function resolveOpeningDetails(
+		string|int|null $accountNumber,
+		?int $openingBalanceInCents,
+		int $defaultOpeningBalanceInCents,
+	): array {
+		if (is_int($accountNumber)) {
+			if ($openingBalanceInCents !== null) {
+				throw new InvalidArgumentException('Opening balance was provided more than once.');
+			}
+
+			$openingBalanceInCents = $accountNumber;
+			$accountNumber = null;
+		}
+
+		return [
+			$accountNumber === null ? $this->generateAccountNumber() : Validator::accountNumber($accountNumber),
+			$openingBalanceInCents ?? $defaultOpeningBalanceInCents,
+		];
 	}
 }

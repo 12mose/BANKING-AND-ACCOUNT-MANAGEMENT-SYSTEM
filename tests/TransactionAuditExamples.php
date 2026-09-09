@@ -71,13 +71,13 @@ if (json_encode($transfer) === false) {
 
 $history = $source->getTransactions();
 $history[] = $transfer;
-if (count($source->getTransactions()) !== 0) {
+if (count($source->getTransactions()) !== 1) {
     throw new RuntimeException('Transaction history should be returned as an immutable snapshot.');
 }
 
 $source->deposit(3000, 'Top-up deposit');
 $entries = $source->getTransactions();
-if (count($entries) !== 1 || $entries[0]->getType() !== TransactionType::DEPOSIT) {
+if (count($entries) !== 2 || $entries[1]->getType() !== TransactionType::DEPOSIT) {
     throw new RuntimeException('Deposit history should be recorded with the correct metadata.');
 }
 

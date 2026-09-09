@@ -20,6 +20,7 @@ abstract class BankAccount
 
     /** @var array<int, Transaction> */
     protected array $transactions = [];
+    private static int $nextTransactionSequence = 1;
 
     protected function __construct(
         string $accountNumber,
@@ -35,6 +36,16 @@ abstract class BankAccount
 
         $this->balanceInCents = $openingBalanceInCents;
         $this->status = AccountStatus::ACTIVE;
+
+        $this->recordTransaction(new Transaction(
+            $this->generateTransactionId(),
+            new DateTimeImmutable('now'),
+            TransactionType::ACCOUNT_OPENING,
+            $openingBalanceInCents,
+            null,
+            $this->accountNumber,
+            'Account opened',
+        ));
     }
 
     public function getAccountNumber(): string
@@ -125,6 +136,15 @@ abstract class BankAccount
         }
 
         $this->status = AccountStatus::CLOSED;
+        $this->recordTransaction(new Transaction(
+            $this->generateTransactionId(),
+            new DateTimeImmutable('now'),
+            TransactionType::ACCOUNT_CLOSURE,
+            $this->balanceInCents,
+            $this->accountNumber,
+            null,
+            'Account closed',
+        ));
     }
 
     /**
@@ -132,7 +152,7 @@ abstract class BankAccount
      */
     public function getTransactions(): array
     {
-        return $this->transactions;
+        return [...$this->transactions];
     }
 
     protected function recordTransaction(Transaction $transaction): void
@@ -174,6 +194,6 @@ abstract class BankAccount
 
     private function generateTransactionId(): string
     {
-        return 'TXN-' . strtoupper(bin2hex(random_bytes(8)));
+        return sprintf('TXN-%010d', self::$nextTransactionSequence++);
     }
 }

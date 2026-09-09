@@ -5,16 +5,19 @@ declare(strict_types=1);
 require_once __DIR__ . '/../Enums/TransactionType.php';
 require_once __DIR__ . '/../Validation/Validator.php';
 require_once __DIR__ . '/../Exceptions/InvalidAccountNumberException.php';
+require_once __DIR__ . '/../Exceptions/InvalidAmountException.php';
 
 final class Transaction
 {
-    private string $transactionId;
-    private DateTimeImmutable $occurredAt;
-    private TransactionType $type;
-    private int $amountInCents;
-    private ?string $sourceAccountNumber;
-    private ?string $destinationAccountNumber;
-    private string $description;
+    private readonly string $transactionId;
+    private readonly DateTimeImmutable $occurredAt;
+    private readonly TransactionType $type;
+    private readonly int $amountInCents;
+    private readonly ?string $sourceAccountNumber;
+    private readonly ?string $destinationAccountNumber;
+    private readonly string $description;
+    /** @var array<string, true> */
+    private static array $issuedTransactionIds = [];
 
     public function __construct(
         string $transactionId,
@@ -29,11 +32,22 @@ final class Transaction
         if ($trimmedId === '') {
             throw new InvalidArgumentException('Transaction id must not be blank.');
         }
+        if (isset(self::$issuedTransactionIds[$trimmedId])) {
+            throw new InvalidArgumentException('Transaction id must be unique.');
+        }
 
         $this->transactionId = $trimmedId;
         $this->occurredAt = $occurredAt;
         $this->type = $type;
-        $this->amountInCents = Validator::amount($amountInCents);
+        if (in_array($type, [TransactionType::ACCOUNT_OPENING, TransactionType::ACCOUNT_CLOSURE], true)) {
+            if ($amountInCents < 0) {
+                throw new InvalidAmountException('Transaction amount cannot be negative.');
+            }
+
+            $this->amountInCents = $amountInCents;
+        } else {
+            $this->amountInCents = Validator::amount($amountInCents);
+        }
         $this->sourceAccountNumber = $sourceAccountNumber !== null ? Validator::accountNumber($sourceAccountNumber) : null;
         $this->destinationAccountNumber = $destinationAccountNumber !== null ? Validator::accountNumber($destinationAccountNumber) : null;
         $this->description = Validator::description($description);
@@ -46,6 +60,8 @@ final class Transaction
                 'Transfer transactions require both a source and destination account.',
             );
         }
+
+        self::$issuedTransactionIds[$trimmedId] = true;
     }
 
     public function getTransactionId(): string
@@ -81,5 +97,19 @@ final class Transaction
     public function getDescription(): string
     {
         return $this->description;
+    }
+
+    /** @return array<string, mixed> */
+    public function toArray(): array
+    {
+        return [
+            'transactionId' => $this->transactionId,
+            'occurredAt' => $this->occurredAt->format(DATE_ATOM),
+            'type' => $this->type->value,
+            'amountInCents' => $this->amountInCents,
+            'sourceAccountNumber' => $this->sourceAccountNumber,
+            'destinationAccountNumber' => $this->destinationAccountNumber,
+            'description' => $this->description,
+        ];
     }
 }
